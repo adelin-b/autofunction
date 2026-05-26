@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "createdAt": "2026-05-26T01:16:26.623Z",
+  "updatedAt": "2026-05-26T01:16:44.936Z",
+  "briefPath": ".omc/ultragoal/brief.md",
+  "goalsPath": ".omc/ultragoal/goals.json",
+  "ledgerPath": ".omc/ultragoal/ledger.jsonl",
+  "claudeGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "G001-bootstrap-install",
+      "title": "Bootstrap & install",
+      "objective": "npm install runs clean, npm test passes vitest (mocked provider), npm run typecheck passes, .env loads via dotenv",
+      "status": "in_progress",
+      "attempt": 1,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:44.936Z",
+      "startedAt": "2026-05-26T01:16:44.936Z"
+    },
+    {
+      "id": "G002-ai-primitive-smoke",
+      "title": "AI primitive smoke",
+      "objective": "Live round-trip via OpenClaw gateway succeeds for autoFunction with Haiku and Sonnet; trace JSONL contains ok=true row",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:26.623Z"
+    },
+    {
+      "id": "G003-schema-validated-outputs",
+      "title": "Schema-validated outputs",
+      "objective": "autoFunction with zod schema returns typed objects; malformed-output test asserts thrown error path is traced (ok=false)",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:26.623Z"
+    },
+    {
+      "id": "G004-shadow-release-wrapper",
+      "title": "Shadow-release wrapper",
+      "objective": "withShadow runs AI + code shadow in parallel, log-only mode returns AI output and flags divergence, prefer-shadow returns code output, paired trace ids linked",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:26.623Z"
+    },
+    {
+      "id": "G005-multi-tier-eval-harness",
+      "title": "Multi-tier eval harness",
+      "objective": "evalSet runs N cases through cheap+smart tiers, per-tier matchRate + avgLatencyMs reported, eval row written to JSONL",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:26.623Z"
+    },
+    {
+      "id": "G006-duckdb-observability",
+      "title": "DuckDB observability",
+      "objective": "npm run traces:query summarises traces by fn+variant+tier with avg latency and error count; runs against real traces from prior stories",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:26.623Z"
+    },
+    {
+      "id": "G007-autoresearch-loop",
+      "title": "Autoresearch loop",
+      "objective": "end-to-end demo where Claude reads detectTheme traces, proposes an improved prompt or shadow-code change, opens a PR with eval evidence (Haiku tier matchRate improves vs baseline)",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-05-26T01:16:26.623Z",
+      "updatedAt": "2026-05-26T01:16:26.623Z"
+    }
+  ],
+  "claudeObjective": "Complete all ultragoal stories in .omc/ultragoal/goals.json: G001-bootstrap-install Bootstrap & install; G002-ai-primitive-smoke AI primitive smoke; G003-schema-validated-outputs Schema-validated outputs; G004-shadow-release-wrapper Shadow-release wrapper; G005-multi-tier-eval-harness Multi-tier eval harness; G006-duckdb-observability DuckDB observability; G007-autoresearch-loop Autoresearch loop",
+  "activeGoalId": "G001-bootstrap-install"
+}
