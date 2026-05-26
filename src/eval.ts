@@ -100,7 +100,7 @@ export async function evalSet<I, O>(
     ok: true,
     meta: { rowCount: rows.length },
   };
-  void writeTrace(evalEvent).catch(() => {});
+  await writeTrace(evalEvent).catch(() => {});
 
   return { fn: opts.name, rows, perTier };
 }

@@ -1,13 +1,12 @@
-import { generateObject, generateText } from "ai";
 import { z, type ZodSchema } from "zod";
-import { openclaw, pickModel, type Tier } from "./provider.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { pickModel, runClaudeP, type Tier } from "./provider.js";
 import { writeTrace, newTraceId, hashInput, type TraceEvent } from "./trace.js";
 
 export type AutoFunctionOpts<O> = {
   name: string;
   tier?: Tier;
   schema?: ZodSchema<O>;
-  temperature?: number;
   systemPrompt?: string;
 };
 
@@ -16,6 +15,7 @@ export type AutoFunctionResult<O> = {
   traceId: string;
   latencyMs: number;
   model: string;
+  costUsd: number;
 };
 
 export async function autoFunction<I, O = string>(
@@ -28,37 +28,37 @@ export async function autoFunction<I, O = string>(
   const traceId = newTraceId();
   const started = Date.now();
 
-  const userPrompt = renderPrompt(promptTemplate, input);
+  const jsonSchema = opts.schema ? zodToJsonSchema(opts.schema, "Output") : undefined;
+  const userPrompt = renderPrompt(promptTemplate, input, jsonSchema);
 
   let output: O;
   let ok = true;
   let errorKind: string | undefined;
   let errorMessage: string | undefined;
-  let promptTokens: number | undefined;
-  let completionTokens: number | undefined;
+  let costUsd = 0;
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
 
   try {
+    const res = await runClaudeP({
+      model,
+      prompt: userPrompt,
+      systemPrompt: opts.systemPrompt,
+      jsonSchema,
+    });
+    costUsd = res.costUsd;
+    inputTokens = res.inputTokens;
+    outputTokens = res.outputTokens;
+
+    if (!res.ok) {
+      throw new Error(`claude -p reported error: ${res.result}`);
+    }
+
     if (opts.schema) {
-      const res = await generateObject({
-        model: openclaw(model),
-        schema: opts.schema,
-        system: opts.systemPrompt,
-        prompt: userPrompt,
-        temperature: opts.temperature ?? 0,
-      });
-      output = res.object as O;
-      promptTokens = res.usage?.promptTokens;
-      completionTokens = res.usage?.completionTokens;
+      const parsed = extractJson(res.result);
+      output = opts.schema.parse(parsed) as O;
     } else {
-      const res = await generateText({
-        model: openclaw(model),
-        system: opts.systemPrompt,
-        prompt: userPrompt,
-        temperature: opts.temperature ?? 0,
-      });
-      output = res.text as unknown as O;
-      promptTokens = res.usage?.promptTokens;
-      completionTokens = res.usage?.completionTokens;
+      output = res.result as unknown as O;
     }
   } catch (e: unknown) {
     ok = false;
@@ -76,15 +76,17 @@ export async function autoFunction<I, O = string>(
       inputHash: hashInput(input),
       input,
       output: ok ? (output! as unknown) : null,
-      promptTokens,
-      completionTokens,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
       latencyMs: Date.now() - started,
       ok,
       errorKind,
       errorMessage,
+      meta: { costUsd },
     };
-    // Fire-and-forget; failure to persist a trace must not break the call.
-    void writeTrace(event).catch(() => {});
+    // Awaited so consumers (and tests) see the trace before the call returns;
+    // errors are swallowed because trace persistence must not break the call.
+    await writeTrace(event).catch(() => {});
   }
 
   return {
@@ -92,13 +94,34 @@ export async function autoFunction<I, O = string>(
     traceId,
     latencyMs: Date.now() - started,
     model,
+    costUsd,
   };
 }
 
-function renderPrompt(template: string, input: unknown): string {
+function renderPrompt(template: string, input: unknown, schema?: unknown): string {
   const inputStr = typeof input === "string" ? input : JSON.stringify(input, null, 2);
-  if (template.includes("{{input}}")) return template.replaceAll("{{input}}", inputStr);
-  return `${template}\n\n${inputStr}`;
+  let prompt = template.includes("{{input}}")
+    ? template.replaceAll("{{input}}", inputStr)
+    : `${template}\n\n${inputStr}`;
+  if (schema) {
+    prompt += `\n\nRespond with a single JSON object that conforms to this schema. No prose, no markdown code fences, no explanations — output only the JSON object.\n\nSchema:\n${JSON.stringify(schema)}`;
+  }
+  return prompt;
+}
+
+function extractJson(text: string): unknown {
+  const trimmed = text.trim();
+  // Happy path: response is already a JSON object.
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return JSON.parse(trimmed);
+  }
+  // Fallback: pull the largest balanced JSON object from prose.
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
+  throw new Error(`No JSON object found in claude -p result: ${trimmed.slice(0, 200)}`);
 }
 
 export { z };

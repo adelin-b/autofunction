@@ -22,19 +22,24 @@ export type TraceEvent = {
   meta?: Record<string, unknown>;
 };
 
-const TRACES_DIR = process.env.AUTOFN_TRACES_DIR ?? "./traces";
+// Resolved per-call so tests that mutate process.env.AUTOFN_TRACES_DIR between
+// runs don't get bound to a module-load-time value.
+function tracesDir(): string {
+  return process.env.AUTOFN_TRACES_DIR ?? "./traces";
+}
 
 function dayFile(): string {
   const d = new Date();
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
   const day = String(d.getUTCDate()).padStart(2, "0");
-  return join(TRACES_DIR, `${y}-${m}-${day}.jsonl`);
+  return join(tracesDir(), `${y}-${m}-${day}.jsonl`);
 }
 
 async function ensureDir(): Promise<void> {
-  if (!existsSync(TRACES_DIR)) {
-    await mkdir(TRACES_DIR, { recursive: true });
+  const dir = tracesDir();
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
   }
 }
 

@@ -45,7 +45,7 @@ export function withShadow<I, O>(
       ok: true,
       meta: { pairedAiTraceId: aiRes.traceId },
     };
-    void writeTrace(shadowEvent).catch(() => {});
+    await writeTrace(shadowEvent).catch(() => {});
 
     const diverged = !eq(aiRes.output, shadowOut);
 

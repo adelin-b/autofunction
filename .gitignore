@@ -13,6 +13,8 @@ traces/*.duckdb.wal
 # omc session ephemera (per-session HUD state should not be tracked)
 .omc/state/
 .omc/logs/
+.omc/sessions/
+.omc/project-memory.json
 
 # Keep .omc/ultragoal/ tracked — that's our durable plan + ledger
 !.omc/ultragoal/

@@ -2,14 +2,17 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-const TRACES_DIR = process.env.AUTOFN_TRACES_DIR ?? "./traces";
+function tracesDir(): string {
+  return process.env.AUTOFN_TRACES_DIR ?? "./traces";
+}
 
 export async function openTraces() {
-  const files = (await readdir(TRACES_DIR)).filter((f) => f.endsWith(".jsonl"));
+  const dir = tracesDir();
+  const files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
   if (files.length === 0) {
-    throw new Error(`No JSONL traces found in ${TRACES_DIR}`);
+    throw new Error(`No JSONL traces found in ${dir}`);
   }
-  const globPath = join(TRACES_DIR, "*.jsonl");
+  const globPath = join(dir, "*.jsonl");
 
   const db = await DuckDBInstance.create(":memory:");
   const conn = await db.connect();
