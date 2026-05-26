@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+.vitest-cache/
+traces/*.jsonl
+traces/*.duckdb
+traces/*.duckdb.wal
+.tsbuildinfo
+# omc session ephemera (per-session HUD state should not be tracked)
+.omc/state/
+.omc/logs/
+
+# Keep .omc/ultragoal/ tracked — that's our durable plan + ledger
+!.omc/ultragoal/
