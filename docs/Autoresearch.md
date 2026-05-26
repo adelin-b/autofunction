@@ -56,9 +56,9 @@ Rules:
 | V2 frame rules | **0.25** (1/4) | 11.1s |
 | Δ | **+0.25** | -3.5s |
 
-Uplift confirmed. The V2 prompt is also faster on average — fewer tokens of reasoning since the rules pre-collapse the decision tree.
+**Caveat — n=4 is anecdotal, not statistically meaningful.** A single recovered case out of four could trivially flip back on a rerun; treat this as a directional signal that the loop *runs end-to-end*, not as evidence that V2 is actually better. The latency delta (-3.5s) is dominated by network variance on this sample size — do not infer causation from "fewer tokens" without a larger run. Follow-up: rerun at n≥20 before claiming uplift.
 
-Haiku still misses 3/4 with V2, which is the **next** autoresearch iteration:
+Haiku still misses 3/4 with V2, which is the **next** autoresearch iteration (future work, not implemented here):
 - Either tighten the rules further (e.g. inject few-shot examples of regulator-action headlines),
 - Or pair the cheap call with a deterministic shadow-code classifier that catches regulator-name keywords ("FDA / CFTC / SEC / Senate / Congress / EU Commission / Court") and overrides the AI label.
 

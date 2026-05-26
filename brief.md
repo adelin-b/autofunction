@@ -9,9 +9,9 @@ Ship `autofunction` v0.1: a TypeScript library that lets you write **typed AI-po
 
 ## Stack (decided)
 - TypeScript + Node 22, `tsx` dev runner.
-- Vercel AI SDK 5 with `@ai-sdk/openai-compatible` provider.
-- Provider endpoint: **OpenClaw gateway** at `http://127.0.0.1:18789/v1`, fronting `claude -p`. Models `claude-sonnet-4-6` (smart) and `claude-haiku-4-5` (cheap).
-- Zod for output schemas. DuckDB (`@duckdb/node-api`) for trace querying. Vitest for tests.
+- Provider: **`claude -p --output-format json` subprocess** (Claude Code CLI). Originally planned as Vercel AI SDK + `@ai-sdk/openai-compatible` against an OpenClaw gateway, but OpenClaw `:18789` turned out to be the control UI, not an OpenAI-compat endpoint — pivoted to direct subprocess on 2026-05-26 (G002).
+- Models `claude-sonnet-4-6` (smart) and `claude-haiku-4-5` (cheap).
+- Zod for output schemas (JSON Schema embedded in the prompt, validated client-side — `claude -p --json-schema` rejects the `$ref` wrapper from `zod-to-json-schema`). DuckDB (`@duckdb/node-api`) for trace querying. Vitest for tests.
 
 ## Constraints
 - Eval and comparison calls must default to Haiku where viable, Sonnet only when comparing or judging.

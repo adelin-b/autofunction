@@ -8,7 +8,15 @@ function tracesDir(): string {
 
 export async function openTraces() {
   const dir = tracesDir();
-  const files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
+  let files: string[];
+  try {
+    files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`No JSONL traces found in ${dir}`);
+    }
+    throw e;
+  }
   if (files.length === 0) {
     throw new Error(`No JSONL traces found in ${dir}`);
   }
@@ -16,8 +24,12 @@ export async function openTraces() {
 
   const db = await DuckDBInstance.create(":memory:");
   const conn = await db.connect();
+  // Escape single quotes per DuckDB's quoted-literal rules (' → '') so paths
+  // containing single quotes (or operator-controlled env input) can't break
+  // the view definition or inject DuckDB SQL.
+  const safeGlob = globPath.replace(/'/g, "''");
   await conn.run(
-    `CREATE OR REPLACE VIEW traces AS SELECT * FROM read_json_auto('${globPath}', format='nd', union_by_name=true)`
+    `CREATE OR REPLACE VIEW traces AS SELECT * FROM read_json_auto('${safeGlob}', format='nd', union_by_name=true)`
   );
   return { db, conn };
 }

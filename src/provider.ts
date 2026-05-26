@@ -28,9 +28,6 @@ export type RunClaudePOpts = {
   prompt: string;
   systemPrompt?: string;
   signal?: AbortSignal;
-  // The CLI flag exists but does not strictly bind the model; we still include
-  // the schema in the prompt and Zod-parse the response. Kept for forward-compat.
-  jsonSchema?: unknown;
 };
 
 export async function runClaudeP(opts: RunClaudePOpts): Promise<ClaudePResult> {
@@ -45,9 +42,6 @@ export async function runClaudeP(opts: RunClaudePOpts): Promise<ClaudePResult> {
   if (opts.systemPrompt) {
     args.push("--system-prompt", opts.systemPrompt);
   }
-  // Note: --json-schema injects a tool definition with strict format requirements
-  // (top-level type:"object" etc.) and does not strongly bind plain text output.
-  // We instead embed the schema in the prompt and Zod-parse the response.
   args.push(opts.prompt);
 
   return new Promise<ClaudePResult>((resolve, reject) => {
@@ -82,9 +76,10 @@ export async function runClaudeP(opts: RunClaudePOpts): Promise<ClaudePResult> {
           rawJson: parsed,
         });
       } catch (e: unknown) {
+        const parseMsg = e instanceof Error ? e.message : String(e);
         reject(
           new Error(
-            `claude -p produced non-JSON output: ${stdout.slice(0, 500)} | stderr: ${stderr.slice(0, 200)}`
+            `claude -p produced non-JSON output (exit ${code}, parse error: ${parseMsg}): ${stdout.slice(0, 500)} | stderr: ${stderr.slice(0, 200)}`
           )
         );
       }

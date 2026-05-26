@@ -1,7 +1,7 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 export type TraceEvent = {
   id: string;
@@ -15,6 +15,7 @@ export type TraceEvent = {
   output: unknown;
   promptTokens?: number;
   completionTokens?: number;
+  costUsd?: number;
   latencyMs: number;
   ok: boolean;
   errorKind?: string;
@@ -43,9 +44,22 @@ async function ensureDir(): Promise<void> {
   }
 }
 
+// Per-process serialization queue keyed by target file. Two in-flight
+// writeTrace calls targeting the same dayfile would otherwise interleave at
+// the OS write boundary once their payload crosses PIPE_BUF (~4KB), producing
+// torn JSON lines that break `read_json_auto(format='nd', …)` in db.ts.
+const writeQueues = new Map<string, Promise<void>>();
+
 export async function writeTrace(event: TraceEvent): Promise<void> {
   await ensureDir();
-  await appendFile(dayFile(), JSON.stringify(event) + "\n", "utf8");
+  const path = dayFile();
+  const line = JSON.stringify(event) + "\n";
+  const prev = writeQueues.get(path) ?? Promise.resolve();
+  const next = prev
+    .catch(() => undefined)
+    .then(() => appendFile(path, line, "utf8"));
+  writeQueues.set(path, next);
+  await next;
 }
 
 export function newTraceId(): string {
@@ -54,7 +68,5 @@ export function newTraceId(): string {
 
 export function hashInput(input: unknown): string {
   const s = typeof input === "string" ? input : JSON.stringify(input);
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(16);
+  return createHash("sha256").update(s).digest("hex").slice(0, 16);
 }

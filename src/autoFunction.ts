@@ -1,4 +1,4 @@
-import { z, type ZodSchema } from "zod";
+import type { ZodSchema } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { pickModel, runClaudeP, type Tier } from "./provider.js";
 import { writeTrace, newTraceId, hashInput, type TraceEvent } from "./trace.js";
@@ -31,7 +31,8 @@ export async function autoFunction<I, O = string>(
   const jsonSchema = opts.schema ? zodToJsonSchema(opts.schema, "Output") : undefined;
   const userPrompt = renderPrompt(promptTemplate, input, jsonSchema);
 
-  let output: O;
+  let output: O | undefined;
+  let hasOutput = false;
   let ok = true;
   let errorKind: string | undefined;
   let errorMessage: string | undefined;
@@ -44,7 +45,6 @@ export async function autoFunction<I, O = string>(
       model,
       prompt: userPrompt,
       systemPrompt: opts.systemPrompt,
-      jsonSchema,
     });
     costUsd = res.costUsd;
     inputTokens = res.inputTokens;
@@ -60,12 +60,14 @@ export async function autoFunction<I, O = string>(
     } else {
       output = res.result as unknown as O;
     }
+    hasOutput = true;
   } catch (e: unknown) {
     ok = false;
     errorKind = e instanceof Error ? e.name : "unknown";
     errorMessage = e instanceof Error ? e.message : String(e);
     throw e;
   } finally {
+    const latencyMs = Date.now() - started;
     const event: TraceEvent = {
       id: traceId,
       ts: new Date().toISOString(),
@@ -75,22 +77,26 @@ export async function autoFunction<I, O = string>(
       model,
       inputHash: hashInput(input),
       input,
-      output: ok ? (output! as unknown) : null,
+      output: hasOutput ? (output as unknown) : null,
       promptTokens: inputTokens,
       completionTokens: outputTokens,
-      latencyMs: Date.now() - started,
+      costUsd,
+      latencyMs,
       ok,
       errorKind,
       errorMessage,
-      meta: { costUsd },
     };
-    // Awaited so consumers (and tests) see the trace before the call returns;
-    // errors are swallowed because trace persistence must not break the call.
+    // Tests assert the JSONL line exists immediately after the call returns,
+    // so we await; errors are swallowed because trace persistence must not
+    // break the caller.
     await writeTrace(event).catch(() => {});
   }
 
+  if (!hasOutput) {
+    throw new Error("autoFunction internal: output not assigned");
+  }
   return {
-    output: output!,
+    output,
     traceId,
     latencyMs: Date.now() - started,
     model,
@@ -123,5 +129,3 @@ function extractJson(text: string): unknown {
   }
   throw new Error(`No JSON object found in claude -p result: ${trimmed.slice(0, 200)}`);
 }
-
-export { z };

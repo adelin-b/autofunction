@@ -53,7 +53,8 @@ describe("autoFunction", () => {
   });
 
   it("parses + validates JSON via zod when schema is provided", async () => {
-    const { autoFunction, z } = await import("../src/autoFunction.js");
+    const { autoFunction } = await import("../src/autoFunction.js");
+    const { z } = await import("zod");
     const { runClaudeP } = await import("../src/provider.js");
     vi.mocked(runClaudeP).mockResolvedValue({
       result: '{"n": 42, "label": "ok"}',
@@ -78,7 +79,8 @@ describe("autoFunction", () => {
   });
 
   it("traces ok=false and rethrows when output violates the schema", async () => {
-    const { autoFunction, z } = await import("../src/autoFunction.js");
+    const { autoFunction } = await import("../src/autoFunction.js");
+    const { z } = await import("zod");
     const { runClaudeP } = await import("../src/provider.js");
     vi.mocked(runClaudeP).mockResolvedValue({
       result: '{"n": "not-a-number"}',
