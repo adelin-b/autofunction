@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-05-26T01:16:26.623Z",
-  "updatedAt": "2026-05-26T01:53:41.819Z",
+  "updatedAt": "2026-05-26T02:12:27.580Z",
   "briefPath": ".omc/ultragoal/brief.md",
   "goalsPath": ".omc/ultragoal/goals.json",
   "ledgerPath": ".omc/ultragoal/ledger.jsonl",
@@ -83,10 +83,13 @@
       "id": "G007-autoresearch-loop",
       "title": "Autoresearch loop",
       "objective": "end-to-end demo where Claude reads detectTheme traces, proposes an improved prompt or shadow-code change, opens a PR with eval evidence (Haiku tier matchRate improves vs baseline)",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-05-26T01:16:26.623Z",
-      "updatedAt": "2026-05-26T01:16:26.623Z"
+      "updatedAt": "2026-05-26T02:12:27.580Z",
+      "startedAt": "2026-05-26T02:00:34.280Z",
+      "evidence": "G007 autoresearch loop end-to-end on claude-haiku-4-5 regulator-action set: baseline matchRate 0.00 (0/4) → V2 frame-disambiguation prompt matchRate 0.25 (1/4), Δ +0.25 (n=4 anecdotal caveat in docs/Autoresearch.md). PR https://github.com/adelin-b/autofunction/pull/1.",
+      "completedAt": "2026-05-26T02:12:27.580Z"
     }
   ],
   "claudeObjective": "Complete all ultragoal stories in .omc/ultragoal/goals.json: G001-bootstrap-install Bootstrap & install; G002-ai-primitive-smoke AI primitive smoke; G003-schema-validated-outputs Schema-validated outputs; G004-shadow-release-wrapper Shadow-release wrapper; G005-multi-tier-eval-harness Multi-tier eval harness; G006-duckdb-observability DuckDB observability; G007-autoresearch-loop Autoresearch loop"
