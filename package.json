@@ -1,6 +1,6 @@
 {
   "name": "autofunction",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Typed AI-powered functions with sandbox, observability, multi-model eval, and code-shadow autoresearch loop",

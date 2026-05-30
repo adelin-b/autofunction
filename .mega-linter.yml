@@ -1,0 +1,36 @@
+# MegaLinter config — https://megalinter.io/configuration/
+APPLY_FIXES: none
+DEFAULT_BRANCH: main
+SHOW_ELAPSED_TIME: true
+FILEIO_REPORTER: false
+PRINT_ALPACA: false
+
+# Linters explicitly enabled. Anything not listed stays default (auto-on for detected languages).
+DISABLE:
+  - COPYPASTE       # noisy for a 5-file scaffold
+  - SPELL           # too many false positives on AI/ML terms
+
+ENABLE_LINTERS:
+  - TYPESCRIPT_ES
+  - TYPESCRIPT_PRETTIER
+  - JAVASCRIPT_ES
+  - JAVASCRIPT_PRETTIER
+  - JSON_JSONLINT
+  - JSON_PRETTIER
+  - YAML_YAMLLINT
+  - YAML_PRETTIER
+  - MARKDOWN_MARKDOWNLINT
+  - BASH_SHELLCHECK
+  - REPOSITORY_GITLEAKS
+  - REPOSITORY_SECRETLINT
+  - REPOSITORY_CHECKOV
+  - REPOSITORY_TRIVY
+
+# Skip generated + vendor + trace artifacts
+FILTER_REGEX_EXCLUDE: '(node_modules/|dist/|traces/|\\.omc/state/|coverage/)'
+
+# Treat findings as warnings on first run; flip to errors after we've cleaned the baseline
+DISABLE_ERRORS_LINTERS:
+  - MARKDOWN_MARKDOWNLINT
+  - REPOSITORY_CHECKOV
+  - REPOSITORY_TRIVY
