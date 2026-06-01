@@ -1,19 +1,7 @@
 import "dotenv/config";
-import { evalSet, z } from "../src/index.js";
-
-const ThemeSchema = z.object({
-  theme: z.enum([
-    "tech",
-    "politics",
-    "sports",
-    "finance",
-    "lifestyle",
-    "health",
-    "other",
-  ]),
-  confidence: z.number().min(0).max(1),
-});
-type Theme = z.infer<typeof ThemeSchema>;
+import { anthropic } from "@ai-sdk/anthropic";
+import { evalSet } from "../src/index.js";
+import { ThemeSchema, type Theme } from "../src/examples-shared/themeSchema.js";
 
 const cases = [
   {
@@ -35,7 +23,10 @@ async function main() {
     name: "detectTheme",
     promptTemplate: "Classify the dominant theme of the following text.",
     schema: ThemeSchema,
-    tiers: ["cheap", "smart"],
+    tiers: {
+      cheap: anthropic("claude-haiku-4-5"),
+      smart: anthropic("claude-sonnet-4-6"),
+    },
     equals: (a, b) => a.theme === b.theme,
   });
 

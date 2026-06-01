@@ -1,21 +1,56 @@
 import type { ZodSchema } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { pickModel, runClaudeP, type Tier } from "./provider.js";
+import { generateObject, generateText, type LanguageModel } from "ai";
 import { writeTrace, newTraceId, hashInput, type TraceEvent } from "./trace.js";
 
+/** Tier label used by `models`/`tier` for multi-model setups. */
+export type Tier = string;
+
 export type AutoFunctionOpts<O> = {
+  /** Logical function name — used as the `fn` field in traces. */
   name: string;
-  tier?: Tier;
+  /**
+   * Zod schema for the output. When set, `generateObject` is called and the
+   * result is the parsed + validated object. When omitted, `generateText` is
+   * called and the result is a plain string.
+   */
   schema?: ZodSchema<O>;
-  systemPrompt?: string;
-};
+  /** Optional abort signal forwarded to the underlying ai-sdk call. */
+  abortSignal?: AbortSignal;
+} & (
+  | {
+      /** Single model — any `LanguageModel` from `@ai-sdk/*` (or `claudeP()`). */
+      model: LanguageModel;
+      models?: never;
+      tier?: never;
+    }
+  | {
+      /** Multi-tier model bag. Pick which one to run with `tier`. */
+      models: Record<string, LanguageModel>;
+      /** Which key of `models` to use. Defaults to `"cheap"` if present, else first key. */
+      tier?: string;
+      model?: never;
+    }
+);
 
 export type AutoFunctionResult<O> = {
   output: O;
   traceId: string;
-  latencyMs: number;
+  /** Provider-specific model id (e.g. "claude-haiku-4-5"). */
   model: string;
-  costUsd: number;
+  /** ai-sdk provider name (e.g. "anthropic"). */
+  provider: string;
+  latencyMs: number;
+  /**
+   * USD cost — only populated by providers that report it (currently just
+   * the built-in `claudeP()` adapter). Otherwise `undefined`; see README.
+   */
+  costUsd: number | undefined;
+  usage: {
+    inputTokens: number | undefined;
+    outputTokens: number | undefined;
+    totalTokens: number | undefined;
+  };
+  finishReason: string;
 };
 
 export async function autoFunction<I, O = string>(
@@ -23,42 +58,63 @@ export async function autoFunction<I, O = string>(
   input: I,
   opts: AutoFunctionOpts<O>
 ): Promise<AutoFunctionResult<O>> {
-  const tier: Tier = opts.tier ?? "smart";
-  const model = pickModel(tier);
+  const { model, tier } = resolveModel(opts);
   const traceId = newTraceId();
+  const userPrompt = renderPrompt(promptTemplate, input);
   const started = Date.now();
 
-  const jsonSchema = opts.schema ? zodToJsonSchema(opts.schema, "Output") : undefined;
-  const userPrompt = renderPrompt(promptTemplate, input, jsonSchema);
+  // `LanguageModel` is `string | LanguageModelV2 | LanguageModelV3`; the
+  // string form is the gateway-id case (e.g. "anthropic/claude-haiku-4-5").
+  // We don't accept strings from users in autoFunction's typed API — the
+  // discriminated union enforces objects — but `resolveModel` returns
+  // whatever the caller passed. Surface a clean error if a string slipped
+  // through (e.g. via `models["cheap"]: "anthropic/…"`).
+  if (typeof model === "string") {
+    throw new Error(
+      `autoFunction: gateway-id model strings ("${model}") are not supported. Pass a LanguageModel instance, e.g. anthropic("claude-haiku-4-5") or claudeP({ model: "..." }).`
+    );
+  }
+
+  const providerName = model.provider;
+  const modelId = model.modelId;
 
   let output: O | undefined;
   let hasOutput = false;
   let ok = true;
   let errorKind: string | undefined;
   let errorMessage: string | undefined;
-  let costUsd = 0;
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
+  let totalTokens: number | undefined;
+  let finishReason = "unknown";
+  let costUsd: number | undefined;
 
   try {
-    const res = await runClaudeP({
-      model,
-      prompt: userPrompt,
-      systemPrompt: opts.systemPrompt,
-    });
-    costUsd = res.costUsd;
-    inputTokens = res.inputTokens;
-    outputTokens = res.outputTokens;
-
-    if (!res.ok) {
-      throw new Error(`claude -p reported error: ${res.result}`);
-    }
-
     if (opts.schema) {
-      const parsed = extractJson(res.result);
-      output = opts.schema.parse(parsed) as O;
+      const res = await generateObject({
+        model,
+        schema: opts.schema,
+        prompt: userPrompt,
+        abortSignal: opts.abortSignal,
+      });
+      output = res.object as O;
+      inputTokens = res.usage.inputTokens;
+      outputTokens = res.usage.outputTokens;
+      totalTokens = res.usage.totalTokens;
+      finishReason = res.finishReason;
+      costUsd = extractCostUsd(providerName, res.providerMetadata);
     } else {
-      output = res.result as unknown as O;
+      const res = await generateText({
+        model,
+        prompt: userPrompt,
+        abortSignal: opts.abortSignal,
+      });
+      output = res.text as unknown as O;
+      inputTokens = res.usage.inputTokens;
+      outputTokens = res.usage.outputTokens;
+      totalTokens = res.usage.totalTokens;
+      finishReason = res.finishReason;
+      costUsd = extractCostUsd(providerName, res.providerMetadata);
     }
     hasOutput = true;
   } catch (e: unknown) {
@@ -74,13 +130,15 @@ export async function autoFunction<I, O = string>(
       fn: opts.name,
       variant: "ai",
       tier,
-      model,
+      provider: providerName,
+      model: modelId,
       inputHash: hashInput(input),
       input,
       output: hasOutput ? (output as unknown) : null,
-      promptTokens: inputTokens,
-      completionTokens: outputTokens,
+      inputTokens,
+      outputTokens,
       costUsd,
+      finishReason,
       latencyMs,
       ok,
       errorKind,
@@ -98,34 +156,63 @@ export async function autoFunction<I, O = string>(
   return {
     output,
     traceId,
+    model: modelId,
+    provider: providerName,
     latencyMs: Date.now() - started,
-    model,
     costUsd,
+    usage: { inputTokens, outputTokens, totalTokens },
+    finishReason,
   };
 }
 
-function renderPrompt(template: string, input: unknown, schema?: unknown): string {
-  const inputStr = typeof input === "string" ? input : JSON.stringify(input, null, 2);
-  let prompt = template.includes("{{input}}")
-    ? template.replaceAll("{{input}}", inputStr)
-    : `${template}\n\n${inputStr}`;
-  if (schema) {
-    prompt += `\n\nRespond with a single JSON object that conforms to this schema. No prose, no markdown code fences, no explanations — output only the JSON object.\n\nSchema:\n${JSON.stringify(schema)}`;
+function resolveModel<O>(
+  opts: AutoFunctionOpts<O>
+): { model: LanguageModel; tier: string | undefined } {
+  if ("model" in opts && opts.model !== undefined) {
+    return { model: opts.model, tier: undefined };
   }
-  return prompt;
+  if ("models" in opts && opts.models !== undefined) {
+    const keys = Object.keys(opts.models);
+    if (keys.length === 0) {
+      throw new Error("autoFunction: `models` is empty.");
+    }
+    const tier =
+      opts.tier ?? (keys.includes("cheap") ? "cheap" : (keys[0] as string));
+    const picked = opts.models[tier];
+    if (!picked) {
+      throw new Error(
+        `autoFunction: tier "${tier}" not found in models (have: ${keys.join(", ")}).`
+      );
+    }
+    return { model: picked, tier };
+  }
+  throw new Error(
+    "autoFunction: must pass either `model` or `models` in opts."
+  );
 }
 
-function extractJson(text: string): unknown {
-  const trimmed = text.trim();
-  // Happy path: response is already a JSON object.
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return JSON.parse(trimmed);
+/**
+ * Best-effort cost extraction from ai-sdk `providerMetadata`. The built-in
+ * `claudeP` adapter publishes USD cost under its own provider namespace; other
+ * providers don't surface cost and this returns `undefined`.
+ */
+function extractCostUsd(
+  providerName: string,
+  meta: unknown
+): number | undefined {
+  if (!meta || typeof meta !== "object") return undefined;
+  const ns = (meta as Record<string, unknown>)[providerName];
+  if (!ns || typeof ns !== "object") return undefined;
+  const v = (ns as Record<string, unknown>).costUsd;
+  return typeof v === "number" ? v : undefined;
+}
+
+function renderPrompt(template: string, input: unknown): string {
+  const inputStr =
+    typeof input === "string" ? input : JSON.stringify(input, null, 2);
+  if (template.includes("{{input}}")) {
+    return template.replaceAll("{{input}}", inputStr);
   }
-  // Fallback: pull the largest balanced JSON object from prose.
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    return JSON.parse(trimmed.slice(start, end + 1));
-  }
-  throw new Error(`No JSON object found in claude -p result: ${trimmed.slice(0, 200)}`);
+  if (inputStr.length === 0) return template;
+  return `${template}\n\n${inputStr}`;
 }

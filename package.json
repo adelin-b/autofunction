@@ -1,23 +1,30 @@
 {
   "name": "autofunction",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Typed AI-powered functions with sandbox, observability, multi-model eval, and code-shadow autoresearch loop",
+  "description": "Typed AI-powered functions with sandbox, observability, multi-model eval, and code-shadow autoresearch loop. Pluggable provider via Vercel AI SDK.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "example:smoke": "tsx examples/smoke.ts",
     "example:detect-theme": "tsx examples/detectTheme.ts",
+    "example:shadow": "tsx examples/shadow-demo.ts",
+    "example:eval": "tsx examples/eval-demo.ts",
+    "example:autoresearch": "tsx examples/autoresearch.ts",
+    "example:claudep": "tsx examples/claudeP-demo.ts",
     "traces:query": "tsx src/cli/traces.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.81",
+    "@ai-sdk/provider": "^3.0.10",
     "@duckdb/node-api": "1.5.3-r.1",
+    "ai": "^6.0.193",
     "dotenv": "^17.0.0",
-    "zod": "^3.25.76",
-    "zod-to-json-schema": "^3.24.5"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

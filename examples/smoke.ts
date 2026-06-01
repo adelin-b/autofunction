@@ -1,18 +1,23 @@
 import "dotenv/config";
+import { anthropic } from "@ai-sdk/anthropic";
 import { autoFunction } from "../src/index.js";
 
 async function smoke() {
   const prompt = "Reply with exactly the single word 'pong' and nothing else.";
 
-  const cheap = await autoFunction(prompt, "", { name: "smoke", tier: "cheap" });
+  const cheap = await autoFunction(prompt, "", {
+    name: "smoke",
+    model: anthropic("claude-haiku-4-5"),
+  });
   console.log(
     JSON.stringify(
       {
         tier: "cheap",
+        provider: cheap.provider,
         model: cheap.model,
         output: cheap.output,
         latencyMs: cheap.latencyMs,
-        costUsd: cheap.costUsd,
+        usage: cheap.usage,
         traceId: cheap.traceId,
       },
       null,
@@ -20,15 +25,19 @@ async function smoke() {
     )
   );
 
-  const smart = await autoFunction(prompt, "", { name: "smoke", tier: "smart" });
+  const smart = await autoFunction(prompt, "", {
+    name: "smoke",
+    model: anthropic("claude-sonnet-4-6"),
+  });
   console.log(
     JSON.stringify(
       {
         tier: "smart",
+        provider: smart.provider,
         model: smart.model,
         output: smart.output,
         latencyMs: smart.latencyMs,
-        costUsd: smart.costUsd,
+        usage: smart.usage,
         traceId: smart.traceId,
       },
       null,

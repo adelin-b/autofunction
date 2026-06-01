@@ -1,18 +1,7 @@
 import "dotenv/config";
-import { autoFunction, z } from "../src/index.js";
-
-const ThemeSchema = z.object({
-  theme: z.enum([
-    "tech",
-    "politics",
-    "sports",
-    "finance",
-    "lifestyle",
-    "health",
-    "other",
-  ]),
-  confidence: z.number().min(0).max(1),
-});
+import { anthropic } from "@ai-sdk/anthropic";
+import { autoFunction } from "../src/index.js";
+import { ThemeSchema } from "../src/examples-shared/themeSchema.js";
 
 async function main() {
   const sample =
@@ -23,16 +12,17 @@ async function main() {
     sample,
     {
       name: "detectTheme",
+      model: anthropic("claude-haiku-4-5"),
       schema: ThemeSchema,
-      tier: "cheap",
     }
   );
   console.log(
     JSON.stringify(
       {
+        provider: res.provider,
         model: res.model,
         latencyMs: res.latencyMs,
-        costUsd: res.costUsd,
+        usage: res.usage,
         output: res.output,
         traceId: res.traceId,
       },

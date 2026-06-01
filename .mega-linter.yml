@@ -27,7 +27,7 @@ ENABLE_LINTERS:
   - REPOSITORY_TRIVY
 
 # Skip generated + vendor + trace artifacts
-FILTER_REGEX_EXCLUDE: '(node_modules/|dist/|traces/|\\.omc/state/|coverage/)'
+FILTER_REGEX_EXCLUDE: '(node_modules/|dist/|traces/|coverage/)'
 
 # Treat findings as warnings on first run; flip to errors after we've cleaned the baseline
 DISABLE_ERRORS_LINTERS:

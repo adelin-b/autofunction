@@ -7,16 +7,16 @@ The autoresearch loop turns the JSONL trace store into a feedback signal for pro
 ```
 1. Run baseline eval (evalSet)        → traces/*.jsonl
 2. Inspect traces for failures        → src/db.ts / npm run traces:query
-3. Identify the pattern that breaks   → manual or Claude-driven
+3. Identify the pattern that breaks   → manual or agent-driven
 4. Propose a fix (prompt change OR
    shadow-code implementation)        → new version-suffixed function
 5. Re-run eval against the same cases → traces/*.jsonl (variant=shadow-eval)
 6. Compare matchRate per tier         → ship V2 only if uplift on the cheap tier
 ```
 
-The loop is intentionally cheap on Haiku — the smart-tier exists only as a baseline + judge for hard cases.
+The loop is intentionally cheap on Haiku — the smart tier exists only as a baseline + judge for hard cases.
 
-## G007 demonstration
+## Worked example: regulator-action set
 
 `examples/autoresearch.ts` runs the loop end-to-end on a regulator-action adversarial set, where the expected label requires recognising the **primary actor** rather than the **topical surface**.
 
@@ -59,6 +59,7 @@ Rules:
 **Caveat — n=4 is anecdotal, not statistically meaningful.** A single recovered case out of four could trivially flip back on a rerun; treat this as a directional signal that the loop *runs end-to-end*, not as evidence that V2 is actually better. The latency delta (-3.5s) is dominated by network variance on this sample size — do not infer causation from "fewer tokens" without a larger run. Follow-up: rerun at n≥20 before claiming uplift.
 
 Haiku still misses 3/4 with V2, which is the **next** autoresearch iteration (future work, not implemented here):
+
 - Either tighten the rules further (e.g. inject few-shot examples of regulator-action headlines),
 - Or pair the cheap call with a deterministic shadow-code classifier that catches regulator-name keywords ("FDA / CFTC / SEC / Senate / Congress / EU Commission / Court") and overrides the AI label.
 

@@ -1,7 +1,7 @@
+import type { LanguageModel } from "ai";
+import type { ZodSchema } from "zod";
 import { autoFunction, type AutoFunctionResult } from "./autoFunction.js";
 import { writeTrace, newTraceId, hashInput, type TraceEvent } from "./trace.js";
-import type { Tier } from "./provider.js";
-import type { ZodSchema } from "zod";
 
 export type EvalCase<I, O> = {
   input: I;
@@ -10,25 +10,35 @@ export type EvalCase<I, O> = {
 
 export type EvalRow<O> = {
   caseIdx: number;
-  tier: Tier;
+  tier: string;
   model: string;
+  provider: string;
   output: O;
   latencyMs: number;
   matchesExpected?: boolean;
 };
 
+export type EvalRollup = {
+  n: number;
+  avgLatencyMs: number;
+  matchRate?: number;
+};
+
 export type EvalReport<O> = {
   fn: string;
   rows: EvalRow<O>[];
-  perTier: Record<Tier, { n: number; avgLatencyMs: number; matchRate?: number }>;
+  perTier: Record<string, EvalRollup>;
 };
 
 export type EvalOpts<O> = {
   name: string;
   promptTemplate: string;
-  tiers?: Tier[];
+  /**
+   * Tier → model bag. One eval row is produced per `(case, tier)` pair.
+   * Keys are free-form labels (commonly `"cheap"` / `"smart"`).
+   */
+  tiers: Record<string, LanguageModel>;
   schema?: ZodSchema<O>;
-  systemPrompt?: string;
   equals?: (a: O, b: O) => boolean;
 };
 
@@ -36,21 +46,23 @@ export async function evalSet<I, O>(
   cases: EvalCase<I, O>[],
   opts: EvalOpts<O>
 ): Promise<EvalReport<O>> {
-  const tiers: Tier[] = opts.tiers ?? ["cheap", "smart"];
+  const tierEntries = Object.entries(opts.tiers);
+  if (tierEntries.length === 0) {
+    throw new Error("evalSet: `tiers` is empty.");
+  }
   const eq = opts.equals ?? defaultEquals<O>;
   const rows: EvalRow<O>[] = [];
 
   for (let i = 0; i < cases.length; i++) {
     const c = cases[i]!;
-    for (const tier of tiers) {
+    for (const [tier, model] of tierEntries) {
       const res: AutoFunctionResult<O> = await autoFunction<I, O>(
         opts.promptTemplate,
         c.input,
         {
           name: opts.name,
-          tier,
-          schema: opts.schema,
-          systemPrompt: opts.systemPrompt,
+          model,
+          ...(opts.schema ? { schema: opts.schema } : {}),
         }
       );
       const matchesExpected =
@@ -59,6 +71,7 @@ export async function evalSet<I, O>(
         caseIdx: i,
         tier,
         model: res.model,
+        provider: res.provider,
         output: res.output,
         latencyMs: res.latencyMs,
         matchesExpected,
@@ -66,26 +79,23 @@ export async function evalSet<I, O>(
     }
   }
 
-  const perTier = Object.fromEntries(
-    tiers.map((t) => {
-      const tierRows = rows.filter((r) => r.tier === t);
-      const withExpected = tierRows.filter((r) => r.matchesExpected !== undefined);
-      const matchRate =
-        withExpected.length === 0
-          ? undefined
-          : withExpected.filter((r) => r.matchesExpected).length / withExpected.length;
-      return [
-        t,
-        {
-          n: tierRows.length,
-          avgLatencyMs:
-            tierRows.reduce((a, r) => a + r.latencyMs, 0) /
-            Math.max(tierRows.length, 1),
-          matchRate,
-        },
-      ];
-    })
-  ) as Record<Tier, { n: number; avgLatencyMs: number; matchRate?: number }>;
+  const perTier: Record<string, EvalRollup> = {};
+  for (const [tier] of tierEntries) {
+    const tierRows = rows.filter((r) => r.tier === tier);
+    const withExpected = tierRows.filter((r) => r.matchesExpected !== undefined);
+    const matchRate =
+      withExpected.length === 0
+        ? undefined
+        : withExpected.filter((r) => r.matchesExpected).length /
+          withExpected.length;
+    perTier[tier] = {
+      n: tierRows.length,
+      avgLatencyMs:
+        tierRows.reduce((a, r) => a + r.latencyMs, 0) /
+        Math.max(tierRows.length, 1),
+      matchRate,
+    };
+  }
 
   const evalTraceId = newTraceId();
   const evalEvent: TraceEvent = {
@@ -93,8 +103,8 @@ export async function evalSet<I, O>(
     ts: new Date().toISOString(),
     fn: opts.name,
     variant: "shadow-eval",
-    inputHash: hashInput({ n: cases.length, tiers }),
-    input: { n: cases.length, tiers },
+    inputHash: hashInput({ n: cases.length, tiers: Object.keys(opts.tiers) }),
+    input: { n: cases.length, tiers: Object.keys(opts.tiers) },
     output: perTier,
     latencyMs: 0,
     ok: true,

@@ -1,19 +1,7 @@
 import "dotenv/config";
-import { autoFunction, withShadow, z } from "../src/index.js";
-
-const ThemeSchema = z.object({
-  theme: z.enum([
-    "tech",
-    "politics",
-    "sports",
-    "finance",
-    "lifestyle",
-    "health",
-    "other",
-  ]),
-  confidence: z.number().min(0).max(1),
-});
-type Theme = z.infer<typeof ThemeSchema>;
+import { anthropic } from "@ai-sdk/anthropic";
+import { autoFunction, withShadow } from "../src/index.js";
+import { ThemeSchema, type Theme } from "../src/examples-shared/themeSchema.js";
 
 const KEYWORDS: Record<Theme["theme"], string[]> = {
   tech: ["software", "ai", "code", "computer", "cpu", "gpu", "linux"],
@@ -50,14 +38,18 @@ const shadowed = withShadow<string, Theme>(
     const r = await autoFunction<string, Theme>(
       "Classify the dominant theme of the following text.",
       text,
-      { name: "detectTheme", schema: ThemeSchema, tier: "cheap" }
+      {
+        name: "detectTheme",
+        model: anthropic("claude-haiku-4-5"),
+        schema: ThemeSchema,
+      }
     );
     return { output: r.output, traceId: r.traceId };
   },
   detectThemeShadow,
   {
     name: "detectTheme",
-    mode: "log-only",
+    mode: "compare",
     equals: (a, b) => a.theme === b.theme,
   }
 );

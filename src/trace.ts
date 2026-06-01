@@ -8,14 +8,28 @@ export type TraceEvent = {
   ts: string;
   fn: string;
   variant: "ai" | "shadow-code" | "shadow-eval";
-  tier?: "smart" | "cheap";
+  tier?: string;
+  /** ai-sdk provider name (e.g. "anthropic", "autofunction-claude-p"). */
+  provider?: string;
+  /** Provider-specific model id (e.g. "claude-haiku-4-5"). */
   model?: string;
   inputHash: string;
   input: unknown;
   output: unknown;
-  promptTokens?: number;
-  completionTokens?: number;
+  /** Input token count as reported by the provider, if any. */
+  inputTokens?: number;
+  /** Output token count as reported by the provider, if any. */
+  outputTokens?: number;
+  /**
+   * USD cost — only populated by providers that surface it (e.g. the
+   * `claudeP` adapter reads `total_cost_usd` from `claude -p`). The Vercel
+   * AI SDK does NOT expose cost for most providers; in that case this stays
+   * undefined and you must compute it from token counts + a price table or
+   * the provider's billing API.
+   */
   costUsd?: number;
+  /** ai-sdk finish reason for AI calls. */
+  finishReason?: string;
   latencyMs: number;
   ok: boolean;
   errorKind?: string;

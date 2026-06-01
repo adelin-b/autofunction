@@ -1,33 +1,20 @@
 import "dotenv/config";
-import { evalSet, z } from "../src/index.js";
+import { anthropic } from "@ai-sdk/anthropic";
+import { evalSet } from "../src/index.js";
+import { ThemeSchema, type Theme } from "../src/examples-shared/themeSchema.js";
 
-// Adversarial cases designed to expose ambiguity between themes — chosen so a
-// naive baseline prompt is likely to pick the second-best label.
-const ThemeSchema = z.object({
-  theme: z.enum([
-    "tech",
-    "politics",
-    "sports",
-    "finance",
-    "lifestyle",
-    "health",
-    "other",
-  ]),
-  confidence: z.number().min(0).max(1),
-});
-type Theme = z.infer<typeof ThemeSchema>;
-
-// Cases chosen so the expected label requires recognising the PRIMARY ACTOR
-// (regulator / agency / legislature) over the more obvious topical label
-// (tech / health / sports / finance). Without the v2 rules, Haiku tends to
-// pick the topic instead of the action frame.
+// Adversarial cases chosen so the expected label requires recognising the
+// PRIMARY ACTOR (regulator / agency / legislature) over the more obvious
+// topical label (tech / health / sports / finance). Without the v2 rules,
+// Haiku tends to pick the topic instead of the action frame.
 const cases = [
   {
     input: "Meta hit with €1.2B EU privacy fine over data transfer rules.",
     expected: { theme: "politics" as const, confidence: 0.8 },
   },
   {
-    input: "FDA halts trial of OpenAI's medical diagnostics tool over safety concerns.",
+    input:
+      "FDA halts trial of OpenAI's medical diagnostics tool over safety concerns.",
     expected: { theme: "politics" as const, confidence: 0.8 },
   },
   {
@@ -58,14 +45,13 @@ const IMPROVED_PROMPT = [
 ].join("\n");
 
 async function runEval(label: string, promptTemplate: string) {
-  const report = await evalSet<string, Theme>(cases, {
+  return evalSet<string, Theme>(cases, {
     name: `detectTheme.${label}`,
     promptTemplate,
     schema: ThemeSchema,
-    tiers: ["cheap"],
+    tiers: { cheap: anthropic("claude-haiku-4-5") },
     equals: (a, b) => a.theme === b.theme,
   });
-  return report;
 }
 
 async function main() {
@@ -86,8 +72,8 @@ async function main() {
   const improved = await runEval("v2", IMPROVED_PROMPT);
   console.log(JSON.stringify(improved.perTier, null, 2));
 
-  const baseRate = baseline.perTier.cheap.matchRate ?? 0;
-  const improvedRate = improved.perTier.cheap.matchRate ?? 0;
+  const baseRate = baseline.perTier.cheap?.matchRate ?? 0;
+  const improvedRate = improved.perTier.cheap?.matchRate ?? 0;
   const delta = improvedRate - baseRate;
   console.log("\n=== autoresearch verdict ===");
   console.log(
